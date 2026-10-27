@@ -1,0 +1,12 @@
+{
+    "requestId":  "test-request-001",
+    "type":  "REGISTRATION_COMPLETE",
+    "phoneResult":  {
+                        "Payload":  {
+                                        "phoneNumberId":  "phone-test-001",
+                                        "phoneNumber":  "+18005550199",
+                                        "phoneNumberArn":  "arn:aws:sms-voice:us-east-1:123456789012:phone-number/phone-test-001"
+                                    }
+                    },
+    "_comment":  "Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. SPDX-License-Identifier: MIT-0"
+}

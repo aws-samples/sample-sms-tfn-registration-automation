@@ -1,0 +1,327 @@
+/* Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+   SPDX-License-Identifier: MIT-0 */
+:root {
+    --aws-orange: #ff9900;
+    --aws-dark: #232f3e;
+    --aws-light: #f2f3f3;
+    --aws-blue: #0073bb;
+    --aws-green: #1b660f;
+    --aws-red: #d13212;
+    --border: #d5dbdb;
+    --text: #16191f;
+    --text-secondary: #545b64;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--aws-light);
+    color: var(--text);
+    line-height: 1.6;
+}
+header {
+    background: var(--aws-dark);
+    color: white;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+header h1 { font-size: 18px; font-weight: 600; }
+header .badge {
+    background: var(--aws-orange);
+    color: var(--aws-dark);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+}
+.container { max-width: 900px; margin: 0 auto; padding: 24px; }
+
+/* Stepper */
+.stepper {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    position: relative;
+}
+.stepper::before {
+    content: '';
+    position: absolute;
+    top: 18px;
+    left: 40px;
+    right: 40px;
+    height: 2px;
+    background: var(--border);
+    z-index: 0;
+}
+.step-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 1;
+    cursor: pointer;
+    flex: 1;
+}
+.step-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 6px;
+    transition: all 0.2s;
+}
+.step-indicator.active .step-circle {
+    background: var(--aws-blue);
+    border-color: var(--aws-blue);
+    color: white;
+}
+.step-indicator.completed .step-circle {
+    background: var(--aws-green);
+    border-color: var(--aws-green);
+    color: white;
+}
+.step-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-align: center;
+    max-width: 80px;
+}
+.step-indicator.active .step-label { color: var(--aws-blue); font-weight: 600; }
+
+/* Cards */
+.card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 16px;
+}
+.card h2 {
+    font-size: 20px;
+    margin-bottom: 4px;
+    color: var(--aws-dark);
+}
+.card .subtitle {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+.section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--aws-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 20px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+
+/* Form elements */
+.field { margin-bottom: 16px; }
+.field label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.field .hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+.field .field-meta {
+    font-size: 11px;
+    color: #888;
+    font-family: monospace;
+    margin-bottom: 4px;
+}
+.field input[type="text"],
+.field input[type="email"],
+.field input[type="url"],
+.field input[type="tel"],
+.field select,
+.field textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+    outline: none;
+    border-color: var(--aws-blue);
+    box-shadow: 0 0 0 2px rgba(0,115,187,0.15);
+}
+.field textarea { min-height: 80px; resize: vertical; }
+.field .required::after {
+    content: ' *';
+    color: var(--aws-red);
+}
+.field input.invalid, .field select.invalid, .field textarea.invalid {
+    border-color: var(--aws-red);
+}
+.field .error-msg {
+    color: var(--aws-red);
+    font-size: 12px;
+    margin-top: 2px;
+    display: none;
+}
+.field .char-count {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-align: right;
+    margin-top: 2px;
+}
+.conditional-note {
+    background: #fef3cd;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 13px;
+    margin-bottom: 16px;
+}
+
+/* Buttons */
+.btn-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 24px;
+    gap: 12px;
+}
+.btn {
+    padding: 10px 24px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-primary { background: var(--aws-blue); color: white; }
+.btn-primary:hover { background: #005ea2; }
+.btn-secondary { background: white; color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--aws-light); }
+.btn-generate { background: var(--aws-orange); color: var(--aws-dark); }
+.btn-generate:hover { background: #ec8b00; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Output */
+.output-section { margin-top: 24px; }
+.output-section h3 { margin-bottom: 8px; font-size: 16px; }
+.cli-block {
+    background: var(--aws-dark);
+    color: #e8e8e8;
+    padding: 16px;
+    border-radius: 6px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    position: relative;
+    margin-bottom: 16px;
+}
+.cli-block .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.cli-block .copy-btn:hover { background: rgba(255,255,255,0.25); }
+.cli-block .comment { color: #7dcea0; }
+.step-panel { display: none; }
+.step-panel.active { display: block; }
+
+/* Info box */
+.info-box {
+    background: #e8f4fd;
+    border-left: 4px solid var(--aws-blue);
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    border-radius: 0 4px 4px 0;
+}
+
+/* ============================================================
+   Utility classes
+   These replace inline style attributes so the page can run under
+   a Content-Security-Policy without 'unsafe-inline' in style-src.
+   ============================================================ */
+.note {
+    margin: 8px 0 0;
+    font-size: 14px;
+}
+
+.note-tight {
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+.note-small {
+    margin: 8px 0 0;
+    font-size: 13px;
+    color: #545b64;
+}
+
+.note-list {
+    margin: 8px 0 0 20px;
+    font-size: 14px;
+}
+
+.w-80 {
+    width: 80px;
+}
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.callout {
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.callout-info {
+    background: #e8f4fd;
+    border: 1px solid #0073bb;
+}
+
+.callout-warning {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+}
+
+.callout-danger {
+    background: #fce4ec;
+    border: 1px solid #d13212;
+}
+
+.callout-success {
+    background: #e8f5e9;
+    border: 1px solid #1b660f;
+    margin-top: 24px;
+    margin-bottom: 0;
+}
+
+.hidden {
+    display: none;
+}

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+     SPDX-License-Identifier: MIT-0 -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toll-Free Programmatic Registration Wizard</title>
+    <meta name="description" content="Step-by-step wizard for programmatic toll-free number registration using AWS End User Messaging SMS CLI commands.">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta name="referrer" content="no-referrer">
+    <link rel="stylesheet" href="wizard.css">
+</head>
+<body>
+    <header>
+        <h1>Toll-Free Programmatic Registration Wizard</h1>
+        <span class="badge">AWS End User Messaging SMS</span>
+    </header>
+
+    <div class="container">
+        <!-- Prerequisites -->
+        <div class="callout callout-warning">
+            <strong>⚠️ Prerequisites</strong>
+            <ul class="note-list">
+                <li><a href="https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html">AWS CLI v2</a> installed and configured with credentials</li>
+                <li>AWS Identity and Access Management (IAM) permissions for <code>sms-voice:CreateRegistration</code>, <code>sms-voice:PutRegistrationFieldValue</code>, <code>sms-voice:SubmitRegistrationVersion</code>, <code>sms-voice:RequestPhoneNumber</code>, and <code>sms-voice:TagResource</code>. Scope these permissions to the minimum required resources in your IAM policy.</li>
+                <li>AWS End User Messaging SMS enabled in your target region</li>
+            </ul>
+        </div>
+        <!-- Cost Warning -->
+        <div class="callout callout-danger">
+            <strong>💰 Cost Warning</strong>
+            <p class="note">Running the generated CLI commands creates billable AWS resources: toll-free number registration fee and monthly phone number lease. See <a href="https://aws.amazon.com/end-user-messaging/pricing/">AWS End User Messaging Pricing</a> for current rates. To remove resources after testing, see the Cleanup section at the bottom of this page.</p>
+        </div>
+        <!-- Security & Shared Responsibility -->
+        <div class="callout callout-info">
+            <strong>🔒 Security &amp; Shared Responsibility</strong>
+            <p class="note">This wizard runs entirely in your browser. No data is transmitted to any server — it generates AWS CLI commands that you copy and run locally. Under the <a href="https://aws.amazon.com/compliance/shared-responsibility-model/">AWS Shared Responsibility Model</a>, you are responsible for:</p>
+            <ul class="note-list">
+                <li>Securing your AWS credentials and IAM permissions</li>
+                <li>Protecting sensitive data entered in this form (tax IDs, contact information)</li>
+                <li>Configuring encryption, access controls, and monitoring on deployed resources</li>
+                <li>Ensuring Amazon Simple Storage Service (Amazon S3) buckets used for attachments have Block Public Access enabled, server-side encryption, TLS enforcement, access logging, and versioning</li>
+                <li>Reviewing the <a href="../documentation/toll-free-registration-automation-security-hardening.md">Security Hardening Guide</a> before production use</li>
+            </ul>
+            <p class="note"><strong>Data sensitivity:</strong> This form collects business-sensitive information including company identification numbers (EIN/VAT), contact details, and messaging use case data. This data is used only to generate CLI commands and is not stored or transmitted by this wizard.</p>
+        </div>
+
+        <div class="stepper" role="navigation" aria-label="Registration steps">
+            <div class="step-indicator active" data-step="0" data-goto-step="0">
+                <div class="step-circle">1</div>
+                <div class="step-label">Company Info</div>
+            </div>
+            <div class="step-indicator" data-step="1" data-goto-step="1">
+                <div class="step-circle">2</div>
+                <div class="step-label">Contact Info</div>
+            </div>
+            <div class="step-indicator" data-step="2" data-goto-step="2">
+                <div class="step-circle">3</div>
+                <div class="step-label">Messaging Use Case</div>
+            </div>
+            <div class="step-indicator" data-step="3" data-goto-step="3">
+                <div class="step-circle">4</div>
+                <div class="step-label">Messages</div>
+            </div>
+            <div class="step-indicator" data-step="4" data-goto-step="4">
+                <div class="step-circle">5</div>
+                <div class="step-label">Generate CLI</div>
+            </div>
+        </div>
+
+        <!-- Step 0: Company Info -->
+        <div class="step-panel active" id="step-0">
+            <div class="card">
+                <h2>Toll-Free Registration — Company Information</h2>
+                <p class="subtitle">Section: companyInfo — All fields are required unless marked conditional.</p>
+
+                <div class="info-box">
+                    <strong>Toll-Free Registration Flow:</strong> Unlike 10DLC, toll-free is a single registration. The toll-free number must be purchased and associated with the registration <em>before</em> submitting (ASSOCIATE_BEFORE_SUBMIT).
+                </div>
+
+                <div class="field">
+                    <label class="required" for="companyName">Company Name</label>
+                    <div class="field-meta">FieldPath: companyInfo.companyName | TEXT | max 100</div>
+                    <div class="hint">Legal name which your company is registered under.</div>
+                    <input type="text" id="companyName" maxlength="100" placeholder="Example Corp" required>
+                </div>
+
+                <div class="field">
+                    <label class="required" for="website">Company Website</label>
+                    <div class="field-meta">FieldPath: companyInfo.website | TEXT | max 100</div>
+                    <div class="hint">Must be publicly accessible. Include https://</div>
+                    <input type="url" id="website" maxlength="100" placeholder="https://www.example.com" required>
+                </div>
+
+                <div class="section-title">Physical Business Address</div>
+
+                <div class="field">
+                    <label class="required" for="address1">Address 1</label>
+                    <div class="field-meta">FieldPath: companyInfo.address1 | TEXT | max 100</div>
+                    <input type="text" id="address1" maxlength="100" placeholder="123 Main Street" required>
+                </div>
+
+                <div class="field">
+                    <label for="address2">Address 2 (optional)</label>
+                    <div class="field-meta">FieldPath: companyInfo.address2 | TEXT | max 100</div>
+                    <input type="text" id="address2" maxlength="100" placeholder="Suite 400">
+                </div>
+
+                <div class="grid-2">
+                    <div class="field">
+                        <label class="required" for="city">City</label>
+                        <div class="field-meta">FieldPath: companyInfo.city | TEXT | max 100</div>
+                        <input type="text" id="city" maxlength="100" placeholder="Seattle" required>
+                    </div>
+                    <div class="field">
+                        <label class="required" for="state">State / Province</label>
+                        <div class="field-meta">FieldPath: companyInfo.state | TEXT | max 50</div>
+                        <input type="text" id="state" maxlength="50" placeholder="WA" required>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="field">
+                        <label class="required" for="zipCode">Zip / Postal Code</label>
+                        <div class="field-meta">FieldPath: companyInfo.zipCode | TEXT | max 20</div>
+                        <input type="text" id="zipCode" maxlength="20" placeholder="98101" required>
+                    </div>
+                    <div class="field">
+                        <label class="required" for="country">Country</label>
+                        <div class="field-meta">FieldPath: companyInfo.isoCountryCode | TEXT | exactly 2 chars</div>
+                        <div class="hint">Two-letter ISO country code (e.g., US).</div>
+                        <input type="text" id="country" maxlength="2" placeholder="US" class="w-80" required>
+                    </div>
+                </div>
+
+                <div class="section-title">Business Classification</div>
+
+                <div class="field">
+                    <label class="required" for="businessType">Business Type</label>
+                    <div class="field-meta">FieldPath: companyInfo.businessType | SELECT</div>
+                    <select id="businessType" required data-action="toggle-company-id">
+                        <option value="">— Select —</option>
+                        <option value="PRIVATE_PROFIT">Private for-profit</option>
+                        <option value="PUBLIC_PROFIT">Public for-profit</option>
+                        <option value="NON_PROFIT">Non-profit</option>
+                        <option value="SOLE_PROPRIETOR">Sole proprietor</option>
+                        <option value="GOVERNMENT">Government</option>
+                    </select>
+                </div>
+
+                <div id="companyIdFields">
+                    <div class="conditional-note">The following fields are required unless you select <strong>Sole proprietor</strong>.</div>
+
+                    <div class="field">
+                        <label class="required" for="companyIdNumber">Company Identification Number</label>
+                        <div class="field-meta">FieldPath: companyInfo.taxId | TEXT | max 50</div>
+                        <div class="hint">Tax ID / EIN / VAT / registration number (e.g., 12-3456789).</div>
+                        <input type="text" id="companyIdNumber" maxlength="50" placeholder="12-3456789">
+                    </div>
+
+                    <div class="field">
+                        <label class="required" for="companyIdType">Identification Number Type</label>
+                        <div class="field-meta">FieldPath: companyInfo.taxIdAuthority | SELECT</div>
+                        <select id="companyIdType">
+                            <option value="">— Select —</option>
+                            <option value="EIN">EIN</option>
+                            <option value="CBN">CBN</option>
+                            <option value="CRN">CRN</option>
+                            <option value="PROVINCIAL_NUMBER">PROVINCIAL_NUMBER</option>
+                            <option value="VAT">VAT</option>
+                            <option value="ACN">ACN</option>
+                            <option value="ABN">ABN</option>
+                            <option value="BRN">BRN</option>
+                            <option value="SIREN">SIREN</option>
+                            <option value="SIRET">SIRET</option>
+                            <option value="NZBN">NZBN</option>
+                            <option value="USt-IdNr">USt-IdNr</option>
+                            <option value="CIF">CIF</option>
+                            <option value="NIF">NIF</option>
+                            <option value="CNPJ">CNPJ</option>
+                            <option value="UID">UID</option>
+                            <option value="NEQ">NEQ</option>
+                            <option value="OTHER">OTHER</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label class="required" for="companyIdCountry">Identification Number Country</label>
+                        <div class="field-meta">FieldPath: companyInfo.taxIdCountry | TEXT | exactly 2 chars</div>
+                        <div class="hint">Two-letter ISO country code where the ID was issued (e.g., US).</div>
+                        <input type="text" id="companyIdCountry" maxlength="2" placeholder="US" class="w-80">
+                    </div>
+                </div>
+
+                <div class="btn-row">
+                    <div></div>
+                    <button class="btn btn-primary" data-action="next">Next: Contact Info →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 1: Contact Info -->
+        <div class="step-panel" id="step-1">
+            <div class="card">
+                <h2>Toll-Free Registration — Contact Information</h2>
+                <p class="subtitle">Section: contactInfo — All fields are required.</p>
+
+                <div class="field">
+                    <label class="required" for="firstName">First Name</label>
+                    <div class="field-meta">FieldPath: contactInfo.firstName | TEXT | max 100</div>
+                    <div class="hint">First name of the business point of contact.</div>
+                    <input type="text" id="firstName" maxlength="100" placeholder="Jane" required>
+                </div>
+
+                <div class="field">
+                    <label class="required" for="lastName">Last Name</label>
+                    <div class="field-meta">FieldPath: contactInfo.lastName | TEXT | max 100</div>
+                    <div class="hint">Last name of the business point of contact.</div>
+                    <input type="text" id="lastName" maxlength="100" placeholder="Doe" required>
+                </div>
+
+                <div class="field">
+                    <label class="required" for="supportEmail">Support Email</label>
+                    <div class="field-meta">FieldPath: contactInfo.supportEmail | TEXT | max 100</div>
+                    <div class="hint">Email of the business point of contact.</div>
+                    <input type="email" id="supportEmail" maxlength="100" placeholder="support@example.com" required>
+                </div>
+
+                <div class="field">
+                    <label class="required" for="supportPhoneNumber">Support Phone Number</label>
+                    <div class="field-meta">FieldPath: contactInfo.supportPhoneNumber | TEXT | max 30</div>
+                    <div class="hint">E.164 format (e.g., +12065550142). No spaces, hyphens, or parentheses.</div>
+                    <input type="tel" id="supportPhoneNumber" maxlength="30" placeholder="+12065550142" required>
+                </div>
+
+                <div class="btn-row">
+                    <button class="btn btn-secondary" data-action="prev">← Back</button>
+                    <button class="btn btn-primary" data-action="next">Next: Messaging Use Case →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Messaging Use Case -->
+        <div class="step-panel" id="step-2">
+            <div class="card">
+                <h2>Toll-Free Registration — Messaging Use Case</h2>
+                <p class="subtitle">Section: messagingUseCase — All fields are required unless marked optional.</p>
+
+                <div class="field">
+                    <label class="required" for="monthlyMessageVolume">Monthly SMS Volume</label>
+                    <div class="field-meta">FieldPath: messagingUseCase.monthlyMessageVolume | SELECT</div>
+                    <div class="hint">Estimated number of SMS messages sent from this toll-free number each month.</div>
+                    <select id="monthlyMessageVolume" required>
+                        <option value="">— Select —</option>
+                        <option value="10">10</option>
+                        <option value="100">100</option>
+                        <option value="1,000">1,000</option>
+                        <option value="10,000">10,000</option>
+                        <option value="100,000">100,000</option>
+                        <option value="250,000">250,000</option>
+                        <option value="500,000">500,000</option>
+                        <option value="750,000">750,000</option>
+                        <option value="1,000,000">1,000,000</option>
+                        <option value="5,000,000">5,000,000</option>
+                        <option value="10,000,000+">10,000,000+</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label class="required" for="useCaseCategory">Use Case Category</label>
+                    <div class="field-meta">FieldPath: messagingUseCase.useCaseCategory | SELECT</div>
+                    <select id="useCaseCategory" required>
+                        <option value="">— Select —</option>
+                        <option value="TWO_FACTOR_AUTHENTICATION">Two-factor authentication</option>
+                        <option value="ONE_TIME_PASSWORDS">One-time passwords</option>
+                        <option value="NOTIFICATIONS">Notifications</option>
+                        <option value="POLLING_AND_SURVEYS">Polling and surveys</option>
+                        <option value="INFO_ON_DEMAND">Info on demand</option>
+                        <option value="PROMOTIONS_AND_MARKETING">Promotions and Marketing</option>
+                        <option value="ONE_TIME_PASSCODES">One time passcodes</option>
+                        <option value="NON_POLITICAL_POLLING_AND_SURVEY">Non political polling and survey</option>
+                        <option value="DELIVERY_NOTIFICATIONS">Delivery notifications</option>
+                        <option value="EDUCATION">Education</option>
+                        <option value="PUBLIC_ANNOUNCEMENTS">Public announcements</option>
+                        <option value="CUSTOMER_CARE">Customer care</option>
+                        <option value="NON_PROFIT">Non profit</option>
+                        <option value="ACCOUNT_NOTIFICATIONS">Account notifications</option>
+                        <option value="EVENT_NOTIFICATIONS">Event notifications</option>
+                        <option value="FINANCIAL_TRANSACTIONS">Financial transactions</option>
+                        <option value="APPOINTMENT">Appointment reminders</option>
+                        <option value="HEALTH_CARE">Health care</option>
+                        <option value="BOOKING">Booking confirmations</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label class="required" for="useCaseDetails">Use Case Details</label>
+                    <div class="field-meta">FieldPath: messagingUseCase.useCaseDetails | TEXT | 40–4096 chars</div>
+                    <div class="hint">Provide additional context about your messaging use case. Identify who the sender is, who the recipient is, and why messages are being sent. Minimum 40 characters.</div>
+                    <textarea id="useCaseDetails" minlength="40" maxlength="4096" required data-char-count="useCaseDetailsCount" placeholder="Example Corp sends one-time password (OTP) messages to customers who have created an account on our website. Messages are triggered when a customer initiates a login or password reset..."></textarea>
+                    <div class="char-count" id="useCaseDetailsCount">0 / 4096</div>
+                </div>
+
+                <div class="section-title">Opt-In Information</div>
+
+                <div class="field">
+                    <label class="required" for="optInType">Opt-in Category</label>
+                    <div class="field-meta">FieldPath: messagingUseCase.optInType | SELECT</div>
+                    <select id="optInType" required>
+                        <option value="">— Select —</option>
+                        <option value="VERBAL">Verbal</option>
+                        <option value="DIGITAL_FORM">Digital form</option>
+                        <option value="PAPER_FORM">Paper form</option>
+                        <option value="TEXT">Text</option>
+                        <option value="QR_CODE">QR code</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label class="required" for="optInWorkflow">Opt-in Workflow Description</label>
+                    <div class="field-meta">FieldPath: messagingUseCase.optInDescription | TEXT | 40–2048 chars</div>
+                    <div class="hint">Explain end-to-end how a user explicitly consents to receive text messages. Minimum 40 characters.</div>
+                    <textarea id="optInWorkflow" minlength="40" maxlength="2048" required data-char-count="optInWorkflowCount" placeholder="Users opt in by creating an account on https://www.example.com and checking the SMS notifications checkbox during registration. The checkbox text reads: 'I agree to receive SMS messages from Example Corp...'"></textarea>
+                    <div class="char-count" id="optInWorkflowCount">0 / 2048</div>
+                </div>
+
+                <div class="field">
+                    <label for="optInImageS3">Opt-in Workflow Image (optional)</label>
+                    <div class="field-meta">FieldPath: messagingUseCase.optInImage | ATTACHMENT | PNG/JPEG, max 400KB</div>
+                    <div class="hint">Screenshot showing how users consent to receiving messages. Provide the Amazon Simple Storage Service (Amazon S3) URI. Required if opt-in is behind login, verbal, or on printed materials. Your S3 bucket should have Block Public Access enabled, server-side encryption (SSE-S3 or SSE-KMS), and a bucket policy enforcing TLS.</div>
+                    <input type="text" id="optInImageS3" placeholder="s3://amzn-s3-demo-bucket/opt-in-screenshot.png">
+                </div>
+
+                <div class="btn-row">
+                    <button class="btn btn-secondary" data-action="prev">← Back</button>
+                    <button class="btn btn-primary" data-action="next">Next: Message Samples →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Message Samples -->
+        <div class="step-panel" id="step-3">
+            <div class="card">
+                <h2>Toll-Free Registration — Message Samples</h2>
+                <p class="subtitle">Section: messageSamples — At least one sample is required. Use realistic messages with variable fields in brackets like [OTP Code].</p>
+
+                <div class="field">
+                    <label class="required" for="messageSample1">Message Sample 1</label>
+                    <div class="field-meta">FieldPath: messageSamples.messageSample1 | TEXT | 20–1024 chars</div>
+                    <div class="hint">Should identify who is sending the message (brand name). Must reflect actual messages you plan to send.</div>
+                    <textarea id="messageSample1" minlength="20" maxlength="1024" required data-char-count="sample1Count" placeholder="Your One-Time Password for Example Corp is [OTP Code]. Please enter this on the verification screen to complete your login."></textarea>
+                    <div class="char-count" id="sample1Count">0 / 1024</div>
+                </div>
+
+                <div class="field">
+                    <label for="messageSample2">Message Sample 2 (optional)</label>
+                    <div class="field-meta">FieldPath: messageSamples.messageSample2 | TEXT | 20–1024 chars</div>
+                    <textarea id="messageSample2" minlength="20" maxlength="1024" data-char-count="sample2Count" placeholder=""></textarea>
+                    <div class="char-count" id="sample2Count">0 / 1024</div>
+                </div>
+
+                <div class="field">
+                    <label for="messageSample3">Message Sample 3 (optional)</label>
+                    <div class="field-meta">FieldPath: messageSamples.messageSample3 | TEXT | 20–1024 chars</div>
+                    <textarea id="messageSample3" minlength="20" maxlength="1024" data-char-count="sample3Count" placeholder=""></textarea>
+                    <div class="char-count" id="sample3Count">0 / 1024</div>
+                </div>
+
+                <div class="section-title">Phone Number Configuration</div>
+
+                <div class="field">
+                    <label class="required" for="phoneMessageType">Phone Number Message Type</label>
+                    <div class="hint">Used when requesting the toll-free phone number.</div>
+                    <select id="phoneMessageType" required>
+                        <option value="TRANSACTIONAL">Transactional</option>
+                        <option value="PROMOTIONAL">Promotional</option>
+                    </select>
+                </div>
+
+                <div class="btn-row">
+                    <button class="btn btn-secondary" data-action="prev">← Back</button>
+                    <button class="btn btn-generate" data-action="next">Generate CLI Commands →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: Generated CLI Output -->
+        <div class="step-panel" id="step-4">
+            <div class="card">
+                <h2>Generated CLI Commands</h2>
+                <p class="subtitle">Copy and run these commands in order. Replace placeholder registration IDs with actual values from each command's response.</p>
+
+                <div class="info-box">
+                    <strong>Important:</strong> Toll-free registrations require ASSOCIATE_BEFORE_SUBMIT — you must purchase the toll-free number and associate it with the registration <em>before</em> submitting. After each command, save the returned IDs and substitute them into subsequent commands.
+                </div>
+
+                <div id="cliOutput"></div>
+
+                <div class="btn-row">
+                    <button class="btn btn-secondary" data-action="prev">← Back to Edit</button>
+                    <button class="btn btn-primary" data-action="copy-all">Copy All Commands</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Cleanup Section -->
+    <div class="container">
+        <div class="callout callout-success">
+            <strong>🧹 Cleanup — Removing Resources After Testing</strong>
+            <p class="note-tight">To avoid ongoing charges, delete the resources created by this wizard:</p>
+            <ol class="note-list">
+                <li><strong>Delete the phone number:</strong> <code>aws pinpoint-sms-voice-v2 release-phone-number --phone-number-id &lt;PHONE_NUMBER_ID&gt;</code></li>
+                <li><strong>Delete the toll-free registration:</strong> <code>aws pinpoint-sms-voice-v2 delete-registration --registration-id &lt;REGISTRATION_ID&gt;</code></li>
+            </ol>
+            <p class="note-small">Note: Registration fees are non-refundable. Monthly phone number lease charges stop after the number is released.</p>
+        </div>
+    </div>
+    <script src="wizard.js"></script>
+</body>
+</html>

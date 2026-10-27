@@ -1,0 +1,8 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+boto3==1.43.114
+moto[dynamodb,s3,sns,stepfunctions,events]==5.2.4
+pytest==9.1.1
+pytest-cov==7.1.0
+requests==2.34.2
+hypothesis==6.170.0

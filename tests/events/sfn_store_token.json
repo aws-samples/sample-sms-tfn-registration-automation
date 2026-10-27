@@ -1,0 +1,7 @@
+{
+    "requestId":  "test-request-001",
+    "action":  "store_task_token",
+    "taskToken":  "AAAAKgAAAAIAAAAAAAAAAQ==example-task-token-for-testing",
+    "waitingFor":  "registration",
+    "_comment":  "Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. SPDX-License-Identifier: MIT-0"
+}

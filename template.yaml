@@ -1,0 +1,473 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Toll-Free Registration Automation - AWS Step Functions + Amazon EventBridge pipeline
+  for automated toll-free number registration, field population, submission, and approval tracking.
+  COST WARNING: This stack creates billable resources. See README for details.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        REGISTRATIONS_TABLE: !Ref RegistrationsTable
+        UPLOAD_BUCKET: !Ref UploadBucket
+        DRY_RUN: !Ref DryRun
+
+Parameters:
+  NotificationEmail:
+    Type: String
+    Description: Email address for registration status notifications
+  AllowedOrigin:
+    Type: String
+    Default: '*'
+    Description: CORS allowed origin for the front end
+  DryRun:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: >
+      When true, Lambda functions skip real AWS End User Messaging SMS API calls
+      and return synthetic registration IDs. Use for end-to-end workflow testing
+      without creating real registrations.
+
+Resources:
+
+  # ============================================================
+  # KMS — Customer managed key for the registrations table
+  # ============================================================
+  RegistrationsTableKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub 'Customer managed key for ${AWS::StackName} registrations table'
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: EnableIAMPolicies
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+
+  RegistrationsTableKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/${AWS::StackName}-registrations'
+      TargetKeyId: !Ref RegistrationsTableKey
+
+  # ============================================================
+  # DynamoDB — Registration state tracking
+  # ============================================================
+  RegistrationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-registrations'
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref RegistrationsTableKey
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      AttributeDefinitions:
+        - AttributeName: requestId
+          AttributeType: S
+        - AttributeName: registrationId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: requestId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: registration-id-index
+          KeySchema:
+            - AttributeName: registrationId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  # ============================================================
+  # S3 — File upload staging bucket
+  # ============================================================
+  UploadBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-uploads-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LoggingConfiguration:
+        DestinationBucketName: !Ref UploadAccessLogsBucket
+        LogFilePrefix: upload-bucket-logs/
+      LifecycleConfiguration:
+        Rules:
+          - Id: AutoDeleteUploads
+            Status: Enabled
+            ExpirationInDays: 90
+          - Id: CleanupOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - !Ref AllowedOrigin
+            AllowedMethods:
+              - PUT
+            AllowedHeaders:
+              - Content-Type
+            MaxAge: 3600
+
+  UploadBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref UploadBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:s3:::${UploadBucket}'
+              - !Sub 'arn:${AWS::Partition}:s3:::${UploadBucket}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+
+  UploadAccessLogsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-access-logs-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      # S3 supports a log bucket targeting itself as long as the prefix differs
+      # from the prefix used by the source bucket. See ADR-008.
+      LoggingConfiguration:
+        LogFilePrefix: access-logs-bucket-logs/
+      LifecycleConfiguration:
+        Rules:
+          - Id: AutoDeleteLogs
+            Status: Enabled
+            ExpirationInDays: 365
+          - Id: CleanupOldLogVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+
+  UploadAccessLogsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref UploadAccessLogsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:s3:::${UploadAccessLogsBucket}'
+              - !Sub 'arn:${AWS::Partition}:s3:::${UploadAccessLogsBucket}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+
+  # ============================================================
+  # SNS — Notifications
+  # ============================================================
+  NotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-notifications'
+      KmsMasterKeyId: alias/aws/sns
+
+  NotificationSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref NotificationTopic
+      Protocol: email
+      Endpoint: !Ref NotificationEmail
+
+  # ============================================================
+  # Amazon API Gateway
+  # ============================================================
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      # Every route needs a SigV4-signed request from an IAM principal with
+      # execute-api:Invoke. Submitting a registration buys a toll-free number,
+      # so the API is never open to unauthenticated callers.
+      Auth:
+        EnableIamAuthorizer: true
+        DefaultAuthorizer: AWS_IAM
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref AllowedOrigin
+        AllowMethods:
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Authorization
+          - Content-Type
+          - X-Amz-Date
+          - X-Amz-Security-Token
+
+  # ============================================================
+  # Lambda Functions
+  # ============================================================
+
+  # Intake — receives form submission, writes to DynamoDB, starts Step Functions
+  IntakeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/intake/
+      Handler: app.handler
+      Environment:
+        Variables:
+          STATE_MACHINE_ARN: !Ref RegistrationStateMachine
+      Events:
+        SubmitRegistration:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /api/submit
+            Method: POST
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RegistrationsTable
+        - StepFunctionsExecutionPolicy:
+            StateMachineName: !GetAtt RegistrationStateMachine.Name
+        - KMSDecryptPolicy:
+            KeyId: !Ref RegistrationsTableKey
+        - Statement:
+            - Effect: Allow
+              Action:
+                - kms:GenerateDataKey
+              Resource: !GetAtt RegistrationsTableKey.Arn
+
+  # Presigned URL generator
+  PresignedUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/presigned_url/
+      Handler: app.handler
+      Events:
+        GetUploadUrl:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /api/upload-url
+            Method: POST
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub 'arn:${AWS::Partition}:s3:::${UploadBucket}/uploads/*'
+
+  # Registration — request phone, create registration, associate, populate, submit
+  RegistrationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/registration/
+      Handler: app.handler
+      Timeout: 120
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RegistrationsTable
+        - S3ReadPolicy:
+            BucketName: !Ref UploadBucket
+        - KMSDecryptPolicy:
+            KeyId: !Ref RegistrationsTableKey
+        - Statement:
+            - Effect: Allow
+              Action:
+                - kms:GenerateDataKey
+              Resource: !GetAtt RegistrationsTableKey.Arn
+        # Scoped to this account and region, per resource type. The IDs of the
+        # registration, phone number, and attachments do not exist until this
+        # function creates them, so the resource segment is a wildcard.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sms-voice:CreateRegistration
+                - sms-voice:PutRegistrationFieldValue
+                - sms-voice:SubmitRegistrationVersion
+              Resource: !Sub 'arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:registration/*'
+            - Effect: Allow
+              Action:
+                - sms-voice:CreateRegistrationAssociation
+                - sms-voice:TagResource
+              Resource:
+                - !Sub 'arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:registration/*'
+                - !Sub 'arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:phone-number/*'
+            - Effect: Allow
+              Action:
+                - sms-voice:RequestPhoneNumber
+              Resource:
+                - !Sub 'arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:phone-number/*'
+                - !Sub 'arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:pool/*'
+            - Effect: Allow
+              Action:
+                - sms-voice:CreateRegistrationAttachment
+                - sms-voice:DescribeRegistrationAttachments
+              Resource: !Sub 'arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:registration-attachment/*'
+
+  # Event Router — EventBridge → lookup task token → SendTaskSuccess/Failure
+  EventRouterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/event_router/
+      Handler: app.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RegistrationsTable
+        - KMSDecryptPolicy:
+            KeyId: !Ref RegistrationsTableKey
+        - Statement:
+            - Effect: Allow
+              Action:
+                - kms:GenerateDataKey
+              Resource: !GetAtt RegistrationsTableKey.Arn
+        - Statement:
+            - Effect: Allow
+              Action:
+                - states:SendTaskSuccess
+                - states:SendTaskFailure
+              Resource: '*'
+
+  # Notification — send alerts via SNS
+  NotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/notification/
+      Handler: app.handler
+      Environment:
+        Variables:
+          NOTIFICATION_TOPIC_ARN: !Ref NotificationTopic
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt NotificationTopic.TopicName
+        - DynamoDBReadPolicy:
+            TableName: !Ref RegistrationsTable
+        - KMSDecryptPolicy:
+            KeyId: !Ref RegistrationsTableKey
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sms-voice:DescribeRegistrationVersions
+                - sms-voice:DescribeRegistrationFieldValues
+              Resource: !Sub 'arn:${AWS::Partition}:sms-voice:${AWS::Region}:${AWS::AccountId}:registration/*'
+
+  # Resume — human-in-the-loop endpoint to resume after manual fix
+  ResumeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/resume/
+      Handler: app.handler
+      Events:
+        ResumeRegistration:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /api/resume/{requestId}
+            Method: POST
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RegistrationsTable
+        - KMSDecryptPolicy:
+            KeyId: !Ref RegistrationsTableKey
+        - Statement:
+            - Effect: Allow
+              Action:
+                - kms:GenerateDataKey
+              Resource: !GetAtt RegistrationsTableKey.Arn
+        - Statement:
+            - Effect: Allow
+              Action:
+                - states:SendTaskSuccess
+              Resource: '*'
+
+  # ============================================================
+  # EventBridge Rule — Registration Status Changes
+  # ============================================================
+  RegistrationStatusRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${AWS::StackName}-registration-status'
+      Description: Captures EUM SMS registration status change events
+      EventPattern:
+        source:
+          - aws.sms-voice
+        detail-type:
+          - Registration Status Change
+      Targets:
+        - Arn: !GetAtt EventRouterFunction.Arn
+          Id: event-router
+
+  EventRouterPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EventRouterFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt RegistrationStatusRule.Arn
+
+  # ============================================================
+  # Step Functions State Machine
+  # ============================================================
+  RegistrationStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: !Sub '${AWS::StackName}-workflow'
+      DefinitionUri: statemachine/registration_workflow.asl.json
+      DefinitionSubstitutions:
+        RegistrationFunctionArn: !GetAtt RegistrationFunction.Arn
+        NotificationFunctionArn: !GetAtt NotificationFunction.Arn
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref RegistrationFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref NotificationFunction
+
+# ============================================================
+# Outputs
+# ============================================================
+Outputs:
+  ApiEndpoint:
+    Description: Amazon API Gateway endpoint URL
+    Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com/prod'
+  UploadBucketName:
+    Description: S3 bucket for file uploads
+    Value: !Ref UploadBucket
+  StateMachineArn:
+    Description: Step Functions state machine ARN
+    Value: !Ref RegistrationStateMachine
+  NotificationTopicArn:
+    Description: SNS topic for notifications
+    Value: !Ref NotificationTopic

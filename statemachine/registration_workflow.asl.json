@@ -1,0 +1,209 @@
+{
+  "Comment": "Toll-Free Registration Automation Workflow",
+  "StartAt": "RequestPhoneNumber",
+  "States": {
+    "RequestPhoneNumber": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${RegistrationFunctionArn}",
+        "Payload": {
+          "requestId.$": "$.requestId",
+          "action": "request_phone_number"
+        }
+      },
+      "ResultPath": "$.phoneResult",
+      "Next": "CreateAndSubmitRegistration",
+      "Comment": "Request a TOLL_FREE phone number (must happen before registration submission)",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "NotifyErrored",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "CreateAndSubmitRegistration": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${RegistrationFunctionArn}",
+        "Payload": {
+          "requestId.$": "$.requestId",
+          "action": "create_associate_populate_submit"
+        }
+      },
+      "ResultPath": "$.registrationResult",
+      "Next": "NotifySubmitted",
+      "Comment": "Create reg, associate phone (BEFORE_SUBMIT), populate fields, submit",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "NotifyErrored",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "NotifySubmitted": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${NotificationFunctionArn}",
+        "Payload": {
+          "requestId.$": "$.requestId",
+          "type": "REGISTRATION_SUBMITTED",
+          "phoneResult.$": "$.phoneResult",
+          "registrationResult.$": "$.registrationResult"
+        }
+      },
+      "ResultPath": "$.submitNotificationResult",
+      "Next": "WaitForApproval"
+    },
+    "WaitForApproval": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+      "Parameters": {
+        "FunctionName": "${RegistrationFunctionArn}",
+        "Payload": {
+          "requestId.$": "$.requestId",
+          "action": "store_task_token",
+          "taskToken.$": "$$.Task.Token",
+          "waitingFor": "registration"
+        }
+      },
+      "ResultPath": "$.approvalResult",
+      "TimeoutSeconds": 2592000,
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed"
+          ],
+          "Next": "RegistrationRejected",
+          "ResultPath": "$.error"
+        },
+        {
+          "ErrorEquals": [
+            "States.Timeout"
+          ],
+          "Next": "RegistrationTimedOut",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "NotifyComplete"
+    },
+    "RegistrationRejected": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${NotificationFunctionArn}",
+        "Payload": {
+          "requestId.$": "$.requestId",
+          "type": "REGISTRATION_REJECTED",
+          "error.$": "$.error"
+        }
+      },
+      "ResultPath": "$.notificationResult",
+      "Next": "WaitForHumanIntervention"
+    },
+    "WaitForHumanIntervention": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+      "Parameters": {
+        "FunctionName": "${RegistrationFunctionArn}",
+        "Payload": {
+          "requestId.$": "$.requestId",
+          "action": "store_task_token",
+          "taskToken.$": "$$.Task.Token",
+          "waitingFor": "human_intervention"
+        }
+      },
+      "ResultPath": "$.humanResult",
+      "TimeoutSeconds": 2592000,
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "REQUIRES_UPDATES",
+            "REQUIRES_AUTHENTICATION"
+          ],
+          "Next": "RegistrationRejected",
+          "ResultPath": "$.error"
+        },
+        {
+          "ErrorEquals": [
+            "States.Timeout"
+          ],
+          "Next": "RegistrationTimedOut",
+          "ResultPath": "$.error"
+        },
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "NotifyErrored",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "NotifyComplete",
+      "Comment": "After human fix, EventBridge fires again or operator calls /api/resume"
+    },
+    "NotifyComplete": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${NotificationFunctionArn}",
+        "Payload": {
+          "requestId.$": "$.requestId",
+          "type": "REGISTRATION_COMPLETE",
+          "phoneResult.$": "$.phoneResult"
+        }
+      },
+      "ResultPath": "$.notificationResult",
+      "Next": "RegistrationComplete"
+    },
+    "RegistrationComplete": {
+      "Type": "Succeed"
+    },
+    "RegistrationTimedOut": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${NotificationFunctionArn}",
+        "Payload": {
+          "requestId.$": "$.requestId",
+          "type": "REGISTRATION_TIMED_OUT",
+          "error.$": "$.error"
+        }
+      },
+      "ResultPath": "$.notificationResult",
+      "Next": "RegistrationFailed"
+    },
+    "RegistrationFailed": {
+      "Type": "Fail",
+      "Error": "RegistrationTimedOut",
+      "Cause": "Registration did not complete within the timeout period"
+    },
+    "NotifyErrored": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${NotificationFunctionArn}",
+        "Payload": {
+          "requestId.$": "$.requestId",
+          "type": "REGISTRATION_ERRORED",
+          "error.$": "$.error"
+        }
+      },
+      "ResultPath": "$.notificationResult",
+      "Next": "WorkflowFailed"
+    },
+    "WorkflowFailed": {
+      "Type": "Fail",
+      "Error": "RegistrationWorkflowFailed",
+      "Cause": "An AWS End User Messaging SMS API call or workflow step failed"
+    }
+  }
+}
