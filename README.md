@@ -191,7 +191,7 @@ sam deploy --guided
 Test the full workflow without real API calls:
 
 ```bash
-sam deploy --parameter-overrides "DryRun=true" "NotificationEmail=you@example.com" "AllowedOrigin=*"
+sam deploy --parameter-overrides "DryRun=true" "NotificationEmail=you@example.com" "AllowedOrigin=http://localhost:3000"
 ```
 
 `--parameter-overrides` replaces the values in `samconfig.toml`, so pass

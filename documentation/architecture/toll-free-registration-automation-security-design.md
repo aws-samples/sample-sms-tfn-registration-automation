@@ -14,7 +14,7 @@ This solution operates under the [AWS Shared Responsibility Model](https://aws.a
 
 **You (the customer) are responsible for:**
 - Reviewing and configuring IAM policies appropriate for your environment
-- Restricting CORS origins from `*` to your specific domain before production use
+- Setting `AllowedOrigin` to your specific domain before production use
 - Enabling AWS CloudTrail for API audit logging
 - Configuring Amazon CloudWatch alarms for error monitoring
 - Granting `execute-api:Invoke` only to the operators who should submit registrations
@@ -182,7 +182,7 @@ touches.
 
 - **Protocol:** HTTPS only (HTTP API — TLS 1.2+).
 - **Authentication:** IAM authorization (`AWS_IAM`) on every route. Callers need `execute-api:Invoke`. To call the API from a browser, switch to an Amazon Cognito JWT authorizer. See the [Security Hardening Guide](../toll-free-registration-automation-security-hardening.md).
-- **CORS:** Configurable via the `AllowedOrigin` SAM parameter. Defaults to `*` for development. You must restrict this to your specific domain in production.
+- **CORS:** Configurable via the `AllowedOrigin` SAM parameter (required, no default). Wildcards are rejected by parameter validation. Set this to your specific domain.
 - **Input validation:** Lambda functions validate request bodies and reject malformed input with structured error responses.
 
 ### Presigned URL Security

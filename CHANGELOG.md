@@ -10,6 +10,7 @@ SPDX-License-Identifier: MIT-0 -->
 - Added `SECURITY.md`
 - `samconfig.toml` uses a placeholder `AllowedOrigin` instead of `*`
 - Pinned test dependencies to exact versions
+- `AllowedOrigin` is required and has no default. An `AllowedPattern` rejects `*` and blank values, so pass a full `http` or `https` origin such as `https://app.example.com`
 
 ### Fixed
 - **Rejection reason missing from emails**: the notification Lambda read `DeniedReasonMessage`, which the API does not return. It now reads `DeniedReasons` from the latest registration version.

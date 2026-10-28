@@ -24,8 +24,14 @@ Parameters:
     Description: Email address for registration status notifications
   AllowedOrigin:
     Type: String
-    Default: '*'
-    Description: CORS allowed origin for the front end
+    Description: >
+      CORS allowed origin for the front end (required). Must be an http or https
+      origin, for example https://app.example.com or http://localhost:3000.
+      Wildcards are not accepted.
+    AllowedPattern: '^https?://[^*\s]+$'
+    ConstraintDescription: >
+      Must be a full http or https origin with no wildcards or spaces,
+      for example https://app.example.com or http://localhost:3000.
   DryRun:
     Type: String
     Default: 'false'

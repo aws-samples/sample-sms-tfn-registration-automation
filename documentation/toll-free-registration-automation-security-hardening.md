@@ -18,7 +18,7 @@ See the [Security Design Document](architecture/toll-free-registration-automatio
 
 ## Priority 1: Restrict CORS Origin (Critical)
 
-**Risk:** The default `AllowedOrigin=*` allows any website to call your API.
+**Risk:** A wildcard `AllowedOrigin` allows any website to call your API.
 
 **Measurable outcome:** API requests are only accepted from your specific domain,
 reducing the attack surface from all origins to one.

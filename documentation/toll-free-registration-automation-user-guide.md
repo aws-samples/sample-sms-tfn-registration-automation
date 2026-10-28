@@ -75,7 +75,7 @@ SAM prompts you for:
 | `Stack Name` | CloudFormation stack name | `toll-free-reg-auto` |
 | `AWS Region` | Deployment region | `us-west-2` (from `samconfig.toml`) |
 | `NotificationEmail` | Email for SNS alerts | *(required)* |
-| `AllowedOrigin` | CORS origin for the front end | `*` |
+| `AllowedOrigin` | CORS origin for the front end | *(required)* |
 | `DryRun` | Skip real EUM SMS API calls | `false` |
 
 ### 3. Confirm the SNS subscription
@@ -100,7 +100,7 @@ Set `DryRun=true` to test the full workflow without making real EUM SMS API call
 - You can test the complete end-to-end flow safely
 
 ```bash
-sam deploy --parameter-overrides "DryRun=true" "NotificationEmail=you@example.com"
+sam deploy --parameter-overrides "DryRun=true" "NotificationEmail=you@example.com" "AllowedOrigin=http://localhost:3000"
 ```
 
 ### CORS Origin
