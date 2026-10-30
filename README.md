@@ -166,6 +166,12 @@ Unsigned requests receive 403.
 ### POST /api/submit
 Submit a registration request. Starts the automated workflow.
 
+`useCaseFields` must include `privacyPolicyUrl` and `termsAndConditionsUrl`
+(http or https, 12 to 500 characters). Starting 15 September 2026,
+[new toll-free registrations require both](https://docs.aws.amazon.com/sms-voice/latest/userguide/registrations-tfn-register-faq.html).
+Requests without them receive 400. `build_test_payload()` in
+`tests/integration/helpers.py` has a full example body.
+
 ### POST /api/upload-url
 Generate a presigned S3 URL for direct-to-S3 file upload.
 

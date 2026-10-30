@@ -159,6 +159,8 @@ def build_test_payload():
             'monthlyMessageVolume': '10,000',
             'useCaseCategory': 'ONE_TIME_PASSCODES',
             'useCaseDetails': 'Sending OTP codes for account verification',
+            'privacyPolicyUrl': 'https://example.com/privacy',
+            'termsAndConditionsUrl': 'https://example.com/terms',
             'optInType': 'VERBAL',
             'optInWorkflow': 'Users opt in during account creation by checking a consent checkbox.',
         },

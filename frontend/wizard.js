@@ -197,6 +197,18 @@ aws pinpoint-sms-voice-v2 put-registration-field-value \\
     --field-path messagingUseCase.useCaseDetails \\
     --text-value '${esc(v('useCaseDetails'))}'`);
 
+    cmd(`\n# messagingUseCase.privacyPolicyUrl
+aws pinpoint-sms-voice-v2 put-registration-field-value \\
+    --registration-id TFN_REG_ID \\
+    --field-path messagingUseCase.privacyPolicyUrl \\
+    --text-value '${esc(v('privacyPolicyUrl'))}'`);
+
+    cmd(`\n# messagingUseCase.termsAndConditionsUrl
+aws pinpoint-sms-voice-v2 put-registration-field-value \\
+    --registration-id TFN_REG_ID \\
+    --field-path messagingUseCase.termsAndConditionsUrl \\
+    --text-value '${esc(v('termsAndConditionsUrl'))}'`);
+
     cmd(`\n# messagingUseCase.optInType
 aws pinpoint-sms-voice-v2 put-registration-field-value \\
     --registration-id TFN_REG_ID \\

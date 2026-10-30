@@ -15,7 +15,8 @@ ASSOCIATE_AFTER_COMPLETE.
 Field sections:
   - companyInfo: companyName, taxId, address, city, state, zipCode, isoCountryCode
   - contactInfo: firstName, lastName, email, phoneNumber
-  - messagingUseCase: monthlyVolume, useCase, useCaseDescription, optInType, optInWorkflow
+  - messagingUseCase: monthlyMessageVolume, useCaseCategory, useCaseDetails,
+    privacyPolicyUrl, termsAndConditionsUrl, optInType, optInDescription, optInImage
   - messageSamples: messageSample1-5
 """
 import os
@@ -54,11 +55,13 @@ CONTACT_INFO_FIELDS = {
 }
 
 USE_CASE_FIELDS = {
-    'monthlyMessageVolume': ('messagingUseCase.monthlyMessageVolume', 'select'),
-    'useCaseCategory':      ('messagingUseCase.useCaseCategory', 'select'),
-    'useCaseDetails':       ('messagingUseCase.useCaseDetails', 'text'),
-    'optInType':            ('messagingUseCase.optInType', 'select'),
-    'optInWorkflow':        ('messagingUseCase.optInDescription', 'text'),
+    'monthlyMessageVolume':  ('messagingUseCase.monthlyMessageVolume', 'select'),
+    'useCaseCategory':       ('messagingUseCase.useCaseCategory', 'select'),
+    'useCaseDetails':        ('messagingUseCase.useCaseDetails', 'text'),
+    'privacyPolicyUrl':      ('messagingUseCase.privacyPolicyUrl', 'text'),
+    'termsAndConditionsUrl': ('messagingUseCase.termsAndConditionsUrl', 'text'),
+    'optInType':             ('messagingUseCase.optInType', 'select'),
+    'optInWorkflow':         ('messagingUseCase.optInDescription', 'text'),
 }
 
 MESSAGE_SAMPLE_FIELDS = [

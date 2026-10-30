@@ -6,6 +6,7 @@ validates input, writes to DynamoDB, and starts Step Functions execution.
 """
 import json
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -15,6 +16,15 @@ dynamodb = boto3.resource('dynamodb')
 sfn = boto3.client('stepfunctions')
 table = dynamodb.Table(os.environ['REGISTRATIONS_TABLE'])
 STATE_MACHINE_ARN = os.environ['STATE_MACHINE_ARN']
+
+# Required for new US toll-free registrations since 15 September 2026
+REQUIRED_URL_FIELDS = ['privacyPolicyUrl', 'termsAndConditionsUrl']
+
+# Stricter than the API pattern for these fields, so a URL that passes here
+# also passes PutRegistrationFieldValue (which runs after the number is bought)
+URL_PATTERN = re.compile(
+    r'https?://[A-Za-z0-9_](?:[A-Za-z0-9_.-]*[A-Za-z0-9_])?\.[A-Za-z]{2,63}(?:[/?#:]\S*)?'
+)
 
 
 def handler(event, context):
@@ -54,6 +64,20 @@ def handler(event, context):
             if len(value) > 500:
                 return _error(400, f'{section_name}.{key} exceeds maximum length of 500 characters')
 
+    # Validate useCaseFields and the required URL fields
+    use_case_fields = body.get('useCaseFields')
+    if not use_case_fields or not isinstance(use_case_fields, dict):
+        return _error(400, 'useCaseFields is required and must be an object')
+
+    missing_urls = [f for f in REQUIRED_URL_FIELDS if not use_case_fields.get(f)]
+    if missing_urls:
+        return _error(400, f'Missing required use case fields: {", ".join(missing_urls)}')
+
+    for key in REQUIRED_URL_FIELDS:
+        value = use_case_fields[key]
+        if not isinstance(value, str) or not 12 <= len(value) <= 500 or not URL_PATTERN.fullmatch(value):
+            return _error(400, f'useCaseFields.{key} must be an http or https URL of 12 to 500 characters')
+
     request_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
@@ -65,7 +89,7 @@ def handler(event, context):
         'updatedAt': now,
         'companyFields': company_fields,
         'contactFields': contact_fields,
-        'useCaseFields': body.get('useCaseFields', {}),
+        'useCaseFields': use_case_fields,
         'messageSamples': body.get('messageSamples', {}),
         'attachments': body.get('attachments', {}),
         'phoneConfig': body.get('phoneConfig', {}),

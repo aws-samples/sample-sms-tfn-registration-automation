@@ -13,6 +13,7 @@ SPDX-License-Identifier: MIT-0 -->
 - `AllowedOrigin` is required and has no default. An `AllowedPattern` rejects `*` and blank values, so pass a full `http` or `https` origin such as `https://app.example.com`
 
 ### Fixed
+- **Privacy Policy and Terms and Conditions URLs**: new toll-free registrations require `messagingUseCase.privacyPolicyUrl` and `messagingUseCase.termsAndConditionsUrl` starting 15 September 2026. The registration Lambda sets both from `useCaseFields`, the intake API returns 400 when either is missing or is not an http or https URL of 12 to 500 characters, and the wizard collects both and generates their commands. The `api_gateway_intake.json` test event uses the current field names.
 - **Rejection reason missing from emails**: the notification Lambda read `DeniedReasonMessage`, which the API does not return. It now reads `DeniedReasons` from the latest registration version.
 - **Silent workflow failures**: `RequestPhoneNumber`, `CreateAndSubmitRegistration` and `WaitForHumanIntervention` now catch errors and send a failure notification. A second rejection during human intervention returns to the rejection path instead of failing the execution.
 - **Attachment upload check**: the registration Lambda stops if an attachment is not `UPLOAD_COMPLETE` after 30 seconds, instead of assigning it anyway

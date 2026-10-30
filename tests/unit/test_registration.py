@@ -59,8 +59,11 @@ def _seed_item(table, request_id='req-001'):
                           'state': 'WA', 'zipCode': '98101', 'isoCountryCode': 'US'},
         'contactFields': {'firstName': 'Jane', 'lastName': 'Doe',
                           'email': 'jane@example.com', 'phoneNumber': '+12065550142'},
-        'useCaseFields': {'monthlyVolume': '10000', 'useCase': 'TWO_FACTOR_AUTHENTICATION',
-                          'useCaseDescription': 'OTP codes', 'optInType': 'VERBAL',
+        'useCaseFields': {'monthlyMessageVolume': '10,000', 'useCaseCategory': 'ONE_TIME_PASSCODES',
+                          'useCaseDetails': 'OTP codes',
+                          'privacyPolicyUrl': 'https://example.com/privacy',
+                          'termsAndConditionsUrl': 'https://example.com/terms',
+                          'optInType': 'VERBAL',
                           'optInWorkflow': 'Customer opts in verbally'},
         'messageSamples': {'messageSample1': 'Your code is 123456.'},
         'attachments': {},
@@ -217,3 +220,45 @@ def test_unknown_action_returns_error(aws_env):
 
     assert 'error' in result
     assert 'do_something_weird' in result['error']
+
+
+@mock_aws
+def test_url_fields_are_populated(aws_env):
+    """Privacy Policy and Terms and Conditions URLs are set on the registration."""
+    table = _create_table()
+    _seed_item(table, 'req-urls')
+
+    app = _load_registration()
+    sms_mock = _mock_sms(app)
+
+    event = {'requestId': 'req-urls', 'action': 'create_associate_populate_submit'}
+    app.handler(event, None)
+
+    put_calls = {
+        c.kwargs['FieldPath']: c.kwargs
+        for c in sms_mock.put_registration_field_value.call_args_list
+    }
+    assert put_calls['messagingUseCase.privacyPolicyUrl']['TextValue'] == 'https://example.com/privacy'
+    assert put_calls['messagingUseCase.termsAndConditionsUrl']['TextValue'] == 'https://example.com/terms'
+
+
+@mock_aws
+def test_required_use_case_fields_are_mapped(aws_env):
+    """Every required messagingUseCase field path has a form key mapped to it."""
+    app = _load_registration()
+
+    mapped = {path for path, _ in app.USE_CASE_FIELDS.values()}
+    mapped |= set(app.ATTACHMENT_FIELDS.values())
+    # REQUIRED messagingUseCase fields from DescribeRegistrationFieldDefinitions
+    # for US_TOLL_FREE_REGISTRATION
+    required = {
+        'messagingUseCase.monthlyMessageVolume',
+        'messagingUseCase.useCaseCategory',
+        'messagingUseCase.useCaseDetails',
+        'messagingUseCase.privacyPolicyUrl',
+        'messagingUseCase.termsAndConditionsUrl',
+        'messagingUseCase.optInType',
+        'messagingUseCase.optInDescription',
+        'messagingUseCase.optInImage',
+    }
+    assert required <= mapped

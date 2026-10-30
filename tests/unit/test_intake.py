@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT-0
 """Unit tests for the Intake Lambda."""
 import json
+import re
 import sys
 import os
 from unittest.mock import MagicMock
@@ -34,6 +35,8 @@ def _valid_body():
         'contactFields': {'firstName': 'Jane', 'lastName': 'Doe',
                           'supportEmail': 'jane@example.com',
                           'supportPhoneNumber': '+12065550142'},
+        'useCaseFields': {'privacyPolicyUrl': 'https://example.com/privacy',
+                          'termsAndConditionsUrl': 'https://example.com/terms'},
     }
 
 
@@ -157,6 +160,8 @@ def test_dynamodb_write_creates_record(aws_env):
     assert item['status'] == 'SUBMITTED'
     assert item['companyFields']['companyName'] == 'Test Co'
     assert item['contactFields']['firstName'] == 'Jane'
+    assert item['useCaseFields']['privacyPolicyUrl'] == 'https://example.com/privacy'
+    assert item['useCaseFields']['termsAndConditionsUrl'] == 'https://example.com/terms'
     assert item['registrationId'] == '-'
     assert item['phoneNumberId'] == '-'
     assert item['taskTokens'] == {}
@@ -165,3 +170,93 @@ def test_dynamodb_write_creates_record(aws_env):
     sfn.start_execution.assert_called_once()
     call_kwargs = sfn.start_execution.call_args.kwargs
     assert f'reg-{request_id}' == call_kwargs['name']
+
+
+# Pattern from DescribeRegistrationFieldDefinitions for both URL fields
+API_URL_PATTERN = re.compile(
+    r'^(https?://)?(?=\w)([\w\-\.])*\w+\.([a-zA-Z]{2,63})([/\w-]*)*/?\??([^#\n\r]*)?#?([^\n\r]*)$'
+)
+
+
+@mock_aws
+def test_missing_use_case_fields_returns_400(aws_env):
+    """Body without useCaseFields returns 400."""
+    _create_table()
+    app = _load_intake()
+
+    payload = _valid_body()
+    del payload['useCaseFields']
+    result = app.handler({'body': json.dumps(payload)}, None)
+
+    assert result['statusCode'] == 400
+    assert 'useCaseFields' in json.loads(result['body'])['error']
+
+
+@mock_aws
+def test_missing_url_fields_returns_400(aws_env):
+    """useCaseFields without both URLs returns 400 naming each field."""
+    _create_table()
+    app = _load_intake()
+    sfn = _mock_sfn(app)
+
+    payload = _valid_body()
+    payload['useCaseFields'] = {'useCaseCategory': 'ONE_TIME_PASSCODES'}
+    result = app.handler({'body': json.dumps(payload)}, None)
+
+    assert result['statusCode'] == 400
+    error = json.loads(result['body'])['error']
+    assert 'privacyPolicyUrl' in error
+    assert 'termsAndConditionsUrl' in error
+    sfn.start_execution.assert_not_called()
+
+
+@mock_aws
+@pytest.mark.parametrize('field', ['privacyPolicyUrl', 'termsAndConditionsUrl'])
+@pytest.mark.parametrize('url', [
+    'not a url',
+    'example.com/privacy',
+    'ftp://example.com/privacy',
+    'HTTPS://example.com/privacy',
+    'https://localhost/privacy',
+    'https://-example.com/privacy',
+    'https://example.com/pri vacy',
+    'https://a.c',
+    'https://example.com/' + 'a' * 481,
+    12345678901234,
+])
+def test_invalid_url_returns_400(aws_env, field, url):
+    """A URL field that is not an http or https URL of 12 to 500 chars returns 400."""
+    _create_table()
+    app = _load_intake()
+    sfn = _mock_sfn(app)
+
+    payload = _valid_body()
+    payload['useCaseFields'][field] = url
+    result = app.handler({'body': json.dumps(payload)}, None)
+
+    assert result['statusCode'] == 400
+    assert f'useCaseFields.{field}' in json.loads(result['body'])['error']
+    sfn.start_execution.assert_not_called()
+
+
+@mock_aws
+@pytest.mark.parametrize('field', ['privacyPolicyUrl', 'termsAndConditionsUrl'])
+@pytest.mark.parametrize('url', [
+    'https://a.co',
+    'http://example.co.uk/terms',
+    'https://www.example.com/legal/privacy-policy?lang=en#sms',
+    'https://example.com:8443/privacy',
+    'https://example.com/' + 'a' * 480,
+])
+def test_valid_url_passes_intake_and_api_pattern(aws_env, field, url):
+    """URLs that intake accepts also match the API pattern for the field."""
+    _create_table()
+    app = _load_intake()
+    _mock_sfn(app)
+
+    payload = _valid_body()
+    payload['useCaseFields'][field] = url
+    result = app.handler({'body': json.dumps(payload)}, None)
+
+    assert result['statusCode'] == 200
+    assert API_URL_PATTERN.match(url)

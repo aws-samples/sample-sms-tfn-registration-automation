@@ -304,6 +304,20 @@
                     <div class="char-count" id="useCaseDetailsCount">0 / 4096</div>
                 </div>
 
+                <div class="field">
+                    <label class="required" for="privacyPolicyUrl">Privacy Policy URL</label>
+                    <div class="field-meta">FieldPath: messagingUseCase.privacyPolicyUrl | TEXT | 12 to 500 chars</div>
+                    <div class="hint">Publicly accessible URL to your organization's privacy policy, consistent with the opt-in disclosures shown to recipients. Include https://</div>
+                    <input type="url" id="privacyPolicyUrl" minlength="12" maxlength="500" placeholder="https://www.example.com/privacy" required>
+                </div>
+
+                <div class="field">
+                    <label class="required" for="termsAndConditionsUrl">Terms and Conditions URL</label>
+                    <div class="field-meta">FieldPath: messagingUseCase.termsAndConditionsUrl | TEXT | 12 to 500 chars</div>
+                    <div class="hint">Publicly accessible URL to your organization's terms and conditions, consistent with the opt-in disclosures shown to recipients. Include https://</div>
+                    <input type="url" id="termsAndConditionsUrl" minlength="12" maxlength="500" placeholder="https://www.example.com/terms" required>
+                </div>
+
                 <div class="section-title">Opt-In Information</div>
 
                 <div class="field">

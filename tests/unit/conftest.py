@@ -103,6 +103,8 @@ def sample_registration_item():
             'monthlyVolume': '10000',
             'useCase': 'TWO_FACTOR_AUTHENTICATION',
             'useCaseDescription': 'Sending OTP codes',
+            'privacyPolicyUrl': 'https://example.com/privacy',
+            'termsAndConditionsUrl': 'https://example.com/terms',
             'optInType': 'VERBAL',
             'optInWorkflow': 'Customer calls in and opts in verbally',
         },

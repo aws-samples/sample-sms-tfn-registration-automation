@@ -51,6 +51,7 @@ Toll-free registration is simpler than 10DLC — there is only **one registratio
 - A valid **email address** for notifications
 - Your company's registration details (legal name, tax ID, address)
 - An **opt-in workflow description** and screenshot
+- Publicly accessible **privacy policy** and **terms and conditions** URLs, required for new toll-free registrations since 15 September 2026
 - At least one **sample message** that reflects what you plan to send
 
 ## Deployment
